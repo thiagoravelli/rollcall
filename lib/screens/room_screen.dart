@@ -106,7 +106,7 @@ class _RoomScreenState extends State<RoomScreen> {
         'user_id': creator['id'],
         'type': 'room_join_request',
         'content': '${widget.loggedInUserName} solicitou para entrar na sua sala',
-        'data': widget.roomId.toString(),
+        'data': '${widget.roomId},$userId',
         'timestamp': DateTime.now().toIso8601String(),
         'is_read': 0,
       });
@@ -287,17 +287,27 @@ class _RoomScreenState extends State<RoomScreen> {
         children: [
           // Game details
           Container(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Image.network(_gameImageURL, width: 150, height: 150, fit: BoxFit.cover),
-                const SizedBox(height: 8),
-                Text('Jogo: $gameName', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                Text('Autor da sala: $creatorName', style: const TextStyle(fontSize: 16)),
-                Text('Data e hora: ${DateFormat('dd/MM/yyyy HH:mm').format(dateTime)}', style: const TextStyle(fontSize: 16)),
-              ],
-            ),
-          ),
+  padding: const EdgeInsets.all(16.0),
+  child: Column(
+    children: [
+      // Display game thumbnail if available
+      if (_room!['thumbnailUrl'] != null && _room!['thumbnailUrl'].isNotEmpty)
+        Image.network(_room!['thumbnailUrl'], width: 150, height: 150, fit: BoxFit.cover)
+      else
+        Image.network(_gameImageURL, width: 150, height: 150, fit: BoxFit.cover),
+      const SizedBox(height: 8),
+      Text('Jogo: ${_room!['gameName']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+      Text('Autor da sala: ${_room!['creatorName']}', style: const TextStyle(fontSize: 16)),
+      Text('Data e hora: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(_room!['dateTime']))}', style: const TextStyle(fontSize: 16)),
+      // Display min and max players
+      if (_room!['minPlayers'] != null && _room!['maxPlayers'] != null)
+        Text('Jogadores: ${_room!['minPlayers']} - ${_room!['maxPlayers']}'),
+      // Display playing time
+      if (_room!['playingTime'] != null)
+        Text('Tempo de jogo: ${_room!['playingTime']} minutos'),
+    ],
+  ),
+),
           const Divider(),
           // Participants and Chat
           Expanded(

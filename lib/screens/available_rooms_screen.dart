@@ -1,3 +1,5 @@
+// ignore_for_file: library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
@@ -8,7 +10,7 @@ class AvailableRoomsScreen extends StatefulWidget {
   final String loggedInUserEmail;
   final String loggedInUserName;
 
-  AvailableRoomsScreen({
+  const AvailableRoomsScreen({super.key, 
     required this.loggedInUserEmail,
     required this.loggedInUserName,
   });
@@ -36,19 +38,19 @@ class _AvailableRoomsScreenState extends State<AvailableRoomsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Salas Disponíveis'),
+        title: const Text('Salas Disponíveis'),
       ),
       body: _rooms.isEmpty
-          ? Center(child: Text('Nenhuma sala disponível.'))
+          ? const Center(child: Text('Nenhuma sala disponível.'))
           : ListView.builder(
               itemCount: _rooms.length,
               itemBuilder: (context, index) {
                 final room = _rooms[index];
                 final dateTime = DateTime.parse(room['dateTime']);
                 return Card(
-                  margin: EdgeInsets.all(8.0),
+                  margin: const EdgeInsets.all(8.0),
                   child: ListTile(
-                    leading: Icon(Icons.videogame_asset),
+                    leading: const Icon(Icons.videogame_asset),
                     title: Text(room['gameName']),
                     subtitle: Text('${DateFormat('dd/MM/yyyy HH:mm').format(dateTime)} - ${room['address']}'),
                     onTap: () {
@@ -75,8 +77,8 @@ class _AvailableRoomsScreenState extends State<AvailableRoomsScreen> {
             _loadRooms();
           });
         },
-        child: Icon(Icons.add),
         tooltip: 'Criar nova sala',
+        child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );

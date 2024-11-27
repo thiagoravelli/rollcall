@@ -1,4 +1,6 @@
 // File: lib/screens/notifications_screen.dart
+// ignore_for_file: library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:rollcall/screens/profile_screen.dart';
 import '../services/database_helper.dart';
@@ -7,12 +9,14 @@ import 'room_screen.dart';
 class NotificationsScreen extends StatefulWidget {
   final String loggedInUserEmail;
   final String loggedInUserName;
+  final VoidCallback? onNotificationsUpdated;
 
   const NotificationsScreen({
-    Key? key,
+    super.key,
     required this.loggedInUserEmail,
     required this.loggedInUserName,
-  }) : super(key: key);
+    this.onNotificationsUpdated,
+  });
 
   @override
   _NotificationsScreenState createState() => _NotificationsScreenState();
@@ -27,15 +31,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications() async {
-    int userId = await _getLoggedInUserId();
-    final notifications = await DatabaseHelper.instance.getNotifications(userId);
-    // Filter out read or answered notifications
-    final filteredNotifications = notifications.where((n) => n['is_read'] == 0).toList();
-    setState(() {
-      _notifications = filteredNotifications;
-    });
+Future<void> _loadNotifications() async {
+  int userId = await _getLoggedInUserId();
+  final notifications = await DatabaseHelper.instance.getUnreadNotifications(userId);
+  setState(() {
+    _notifications = notifications;
+  });
+  // Notify HomeScreen about the update
+  if (widget.onNotificationsUpdated != null) {
+    widget.onNotificationsUpdated!();
   }
+}
+
 
   Future<int> _getLoggedInUserId() async {
     final db = await DatabaseHelper.instance.database;
@@ -207,13 +214,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         )
                       : null,
                   onTap: () async {
-                    // Mark notification as read
-                    await DatabaseHelper.instance.markNotificationAsRead(notification['id'] as int);
-                    _loadNotifications();
+  // Check if the notification requires user action
+  if (notification['type'] != 'room_invitation' &&
+      notification['type'] != 'friend_request' &&
+      notification['type'] != 'room_join_request') {
+    // Mark system notification as read
+    await DatabaseHelper.instance.markNotificationAsRead(notification['id'] as int);
+    _loadNotifications();
+  }
 
-                    // Handle the notification action
-                    await _handleNotificationAction(notification);
-                  },
+  // Handle the notification action
+  await _handleNotificationAction(notification);
+},
+
                 );
               },
             ),

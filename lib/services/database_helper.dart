@@ -30,7 +30,7 @@ class DatabaseHelper {
     // Open the database, creating it if it doesn't exist
     return await openDatabase(
       path,
-      version: 4, // Incremented version number
+      version: 5, // Incremented version number
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -86,16 +86,22 @@ class DatabaseHelper {
 
     // Create 'rooms' table
     await db.execute('''
-      CREATE TABLE rooms (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        gameName TEXT NOT NULL,
-        dateTime TEXT NOT NULL,
-        address TEXT NOT NULL,
-        playerSlots INTEGER NOT NULL,
-        waitlistSlots INTEGER NOT NULL,
-        creatorName TEXT NOT NULL
-      )
-    ''');
+  CREATE TABLE rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gameName TEXT NOT NULL,
+    gameId INTEGER, -- Add this line
+    thumbnailUrl TEXT, -- Add this line
+    minPlayers INTEGER, -- Add this line
+    maxPlayers INTEGER, -- Add this line
+    playingTime INTEGER, -- Add this line
+    dateTime TEXT NOT NULL,
+    address TEXT NOT NULL,
+    playerSlots INTEGER NOT NULL,
+    waitlistSlots INTEGER NOT NULL,
+    creatorName TEXT NOT NULL
+  )
+''');
+
 
     // Create 'room_participants' table
     await db.execute('''
@@ -148,7 +154,7 @@ class DatabaseHelper {
 
   // Upgrade the database if the version number has changed
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 4) {
+    if (oldVersion < 5) {
       // For simplicity, drop existing tables and recreate them
       // In production, you should handle migrations properly
       await db.execute('DROP TABLE IF EXISTS chat_messages');
@@ -160,7 +166,6 @@ class DatabaseHelper {
       await db.execute('DROP TABLE IF EXISTS friends');
       await db.execute('DROP TABLE IF EXISTS friend_requests');
       await db.execute('DROP TABLE IF EXISTS users');
-
       // Recreate the database
       await _createDB(db, newVersion);
     }
@@ -186,9 +191,10 @@ class DatabaseHelper {
 
   // Insert a new room
   Future<int> insertRoom(Map<String, dynamic> room) async {
-    final db = await instance.database;
-    return await db.insert('rooms', room);
-  }
+  final db = await database;
+  return await db.insert('rooms', room);
+}
+
 
   // Update room details (e.g., adding an image URL column in the future)
   Future<int> updateRoom(int roomId, Map<String, dynamic> updatedFields) async {
@@ -212,17 +218,22 @@ class DatabaseHelper {
   }
 
   // Get a specific room by ID
-  Future<Map<String, dynamic>?> getRoomById(int roomId) async {
-    final db = await instance.database;
-    final result = await db.query('rooms', where: 'id = ?', whereArgs: [roomId]);
+  Future<Map<String, dynamic>?> getRoomById(int id) async {
+    final db = await database;
+    final result = await db.query('rooms', where: 'id = ?', whereArgs: [id]);
     return result.isNotEmpty ? result.first : null;
   }
 
+
   // Add a participant to a room
-  Future<int> addParticipant(int roomId, int userId) async {
-    final db = await instance.database;
-    return await db.insert('room_participants', {'room_id': roomId, 'user_id': userId});
+  Future<void> addParticipant(int roomId, int userId) async {
+    final db = await database;
+      await db.insert('room_participants', {
+        'room_id': roomId,
+        'user_id': userId,
+      });
   }
+
 
   // Remove a participant from a room
   Future<int> removeParticipant(int roomId, int userId) async {
@@ -390,20 +401,33 @@ class DatabaseHelper {
         where: 'invitee_id = ? AND status = ?', whereArgs: [userId, 'pending']);
   }
 
-  Future<void> acceptRoomInvitation(int invitationId) async {
-    final db = await instance.database;
-    // Get invitation details
-    final result = await db.query('room_invitations', where: 'id = ?', whereArgs: [invitationId]);
-    if (result.isNotEmpty) {
-      final invitation = result.first;
-      int roomId = invitation['room_id'] as int;
-      int inviteeId = invitation['invitee_id'] as int;
-      // Update the invitation status
-      await db.update('room_invitations', {'status': 'accepted'}, where: 'id = ?', whereArgs: [invitationId]);
-      // Add the user to the room participants
-      await addParticipant(roomId, inviteeId);
-    }
+// In DatabaseHelper class
+Future<void> acceptRoomInvitation(int invitationId) async {
+  final db = await database;
+
+  // Get the invitation details
+  final invitation = await db.query(
+    'room_invitations',
+    where: 'id = ?',
+    whereArgs: [invitationId],
+  );
+
+  if (invitation.isNotEmpty) {
+    final roomId = invitation.first['room_id'] as int;
+    final inviteeId = invitation.first['invitee_id'] as int;
+
+    // Add the invitee as a participant in the room
+    await addParticipant(roomId, inviteeId);
+
+    // Update the invitation status to 'accepted'
+    await db.update(
+      'room_invitations',
+      {'status': 'accepted'},
+      where: 'id = ?',
+      whereArgs: [invitationId],
+    );
   }
+}
 
   Future<void> declineRoomInvitation(int invitationId) async {
     final db = await instance.database;
@@ -461,17 +485,17 @@ class DatabaseHelper {
 
   Future<void> acceptRoomJoinRequest(int requestId) async {
     final db = await instance.database;
-    // Get request details
-    final result = await db.query('room_join_requests', where: 'id = ?', whereArgs: [requestId]);
-    if (result.isNotEmpty) {
-      final request = result.first;
-      int roomId = request['room_id'] as int;
-      int requesterId = request['requester_id'] as int;
-      // Update request status
-      await db.update('room_join_requests', {'status': 'accepted'}, where: 'id = ?', whereArgs: [requestId]);
-      // Add the user to room participants
-      await addParticipant(roomId, requesterId);
-    }
+      // Get request details
+      final result = await db.query('room_join_requests', where: 'id = ?', whereArgs: [requestId]);
+      if (result.isNotEmpty) {
+        final request = result.first;
+        int roomId = request['room_id'] as int;
+        int requesterId = request['requester_id'] as int;
+        // Update request status
+        await db.update('room_join_requests', {'status': 'accepted'}, where: 'id = ?', whereArgs: [requestId]);
+        // Add the user to room participants
+        await addParticipant(roomId, requesterId);
+      }
   }
 
   Future<void> declineRoomJoinRequest(int requestId) async {
@@ -488,11 +512,16 @@ class DatabaseHelper {
 
   Future<int> getRoomJoinRequestId(Map<String, dynamic> notification) async {
     final db = await instance.database;
-    int roomId = int.parse(notification['data'] as String);
-    int userId = notification['user_id'] as int;
+    String dataString = notification['data'] as String;
+    List<String> parts = dataString.split(',');
+    if (parts.length != 2) {
+      throw Exception('Invalid data in notification');
+    }
+    int roomId = int.parse(parts[0]);
+    int requesterId = int.parse(parts[1]);
     final result = await db.query('room_join_requests',
         where: 'requester_id = ? AND room_id = ? AND status = ?',
-        whereArgs: [userId, roomId, 'pending']);
+        whereArgs: [requesterId, roomId, 'pending']);
     if (result.isNotEmpty) {
       return result.first['id'] as int;
     }
@@ -548,6 +577,16 @@ class DatabaseHelper {
       return result.first['inviter_id'] as int;
     }
     return 0;
+  }
+
+  Future<List<Map<String, dynamic>>> getUnreadNotifications(int userId) async {
+    final db = await instance.database;
+    return await db.query(
+      'notifications',
+      where: 'user_id = ? AND is_read = 0',
+      whereArgs: [userId],
+      orderBy: 'timestamp DESC',
+    );
   }
 
 }
