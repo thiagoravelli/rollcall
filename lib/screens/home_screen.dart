@@ -47,7 +47,9 @@ class _MyHomePageState extends State<MyHomePage> {
         loggedInUserEmail: widget.loggedInUserEmail,
         loggedInUserName: widget.loggedInUserName,
       ), // Displays own profile
-      SettingsScreen(onLogout: widget.onLogout),
+      SettingsScreen(onLogout: widget.onLogout,
+      loggedInUserEmail: widget.loggedInUserEmail,
+      loggedInUserName: widget.loggedInUserName,),
     ];
 
     // Load unread notifications count

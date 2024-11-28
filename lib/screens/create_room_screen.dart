@@ -47,6 +47,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
   // Handle room creation
   void _handleCreateRoom() async {
+    int? loggedInUserId = await DatabaseHelper.instance.getUserIdByEmail(widget.loggedInUserEmail);
     if (_selectedGame == null) {
       _showErrorDialog('Por favor, selecione um jogo.');
       return;
@@ -82,7 +83,9 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       'address': address,
       'playerSlots': _selectedPlayerSlots,
       'waitlistSlots': _selectedWaitlistSlots,
+      'creatorId': loggedInUserId,
       'creatorName': widget.loggedInUserName,
+      'creatorEmail' : widget.loggedInUserEmail
     };
 
     try {

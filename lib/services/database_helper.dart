@@ -1,7 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+
 class DatabaseHelper {
+  // Current Version
   // Singleton instance
   static final DatabaseHelper instance = DatabaseHelper._init();
 
@@ -30,7 +32,7 @@ class DatabaseHelper {
     // Open the database, creating it if it doesn't exist
     return await openDatabase(
       path,
-      version: 5, // Incremented version number
+      version: 7, // Incremented version number
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -86,21 +88,24 @@ class DatabaseHelper {
 
     // Create 'rooms' table
     await db.execute('''
-  CREATE TABLE rooms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gameName TEXT NOT NULL,
-    gameId INTEGER, -- Add this line
-    thumbnailUrl TEXT, -- Add this line
-    minPlayers INTEGER, -- Add this line
-    maxPlayers INTEGER, -- Add this line
-    playingTime INTEGER, -- Add this line
-    dateTime TEXT NOT NULL,
-    address TEXT NOT NULL,
-    playerSlots INTEGER NOT NULL,
-    waitlistSlots INTEGER NOT NULL,
-    creatorName TEXT NOT NULL
-  )
-''');
+    CREATE TABLE rooms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gameName TEXT NOT NULL,
+      gameId INTEGER,
+      thumbnailUrl TEXT,
+      minPlayers INTEGER,
+      maxPlayers INTEGER,
+      playingTime INTEGER,
+      dateTime TEXT NOT NULL,
+      address TEXT NOT NULL,
+      playerSlots INTEGER NOT NULL,
+      waitlistSlots INTEGER NOT NULL,
+      creatorId INTEGER NOT NULL,
+      creatorName TEXT NOT NULL,
+      creatorEmail TEXT NOT NULL,
+      FOREIGN KEY(creatorId) REFERENCES users(id)
+    )
+  ''');
 
 
     // Create 'room_participants' table
@@ -154,7 +159,7 @@ class DatabaseHelper {
 
   // Upgrade the database if the version number has changed
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 5) {
+    if (oldVersion < newVersion) {
       // For simplicity, drop existing tables and recreate them
       // In production, you should handle migrations properly
       await db.execute('DROP TABLE IF EXISTS chat_messages');
@@ -588,5 +593,77 @@ Future<void> acceptRoomInvitation(int invitationId) async {
       orderBy: 'timestamp DESC',
     );
   }
+
+  Future<List<String>> getFriendsEmails(String userEmail) async {
+  // Replace with actual database query to get friends' emails
+  // For example, from a 'friends' table
+  final db = await database;
+  List<Map> results = await db.query('friends', where: 'userEmail = ?', whereArgs: [userEmail]);
+  return results.map((result) => result['friendEmail'] as String).toList();
+}
+
+
+// Get User ID by Email
+Future<int?> getUserIdByEmail(String email) async {
+  final db = await instance.database;
+  final result = await db.query('users', where: 'email = ?', whereArgs: [email], limit: 1);
+  return result.isNotEmpty ? result.first['id'] as int : null;
+}
+
+// Get Friends' IDs
+Future<List<int>> getFriendsIds(int userId) async {
+  final db = await instance.database;
+  final result = await db.query('friends', where: 'user_id = ?', whereArgs: [userId]);
+  return result.map((row) => row['friend_id'] as int).toList();
+}
+
+// Check if User is Participating in a Room
+Future<bool> isUserParticipatingInRoom(String userEmail, int roomId) async {
+  final db = await instance.database;
+
+  // Get user ID by email
+  final userResult = await db.query('users', where: 'email = ?', whereArgs: [userEmail], limit: 1);
+  if (userResult.isEmpty) {
+    return false;
+  }
+  final userId = userResult.first['id'] as int;
+
+  final result = await db.query(
+    'room_participants',
+    where: 'user_id = ? AND room_id = ?',
+    whereArgs: [userId, roomId],
+  );
+  return result.isNotEmpty;
+}
+
+
+Future<List<Map<String, dynamic>>> getUserFriendsByEmail(String userEmail) async {
+  final db = await instance.database;
+  // Get the user's ID
+  int? userId = await getUserIdByEmail(userEmail);
+  if (userId == null) {
+    return [];
+  }
+
+  final result = await db.query('friends', where: 'user_id = ?', whereArgs: [userId]);
+  List<int> friendIds = result.map((row) => row['friend_id'] as int).toList();
+
+  // Now get user details for each friend
+  List<Map<String, dynamic>> friends = [];
+  for (int friendId in friendIds) {
+    final user = await getUserById(friendId);
+    if (user != null) {
+      friends.add(user);
+    }
+  }
+  return friends;
+}
+
+// Remove a friend relationship
+Future<void> removeFriend(int userId, int friendId) async {
+  final db = await instance.database;
+  await db.delete('friends', where: 'user_id = ? AND friend_id = ?', whereArgs: [userId, friendId]);
+  await db.delete('friends', where: 'user_id = ? AND friend_id = ?', whereArgs: [friendId, userId]);
+}
 
 }
